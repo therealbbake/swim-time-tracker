@@ -16,7 +16,7 @@ class Swimmer:
         self.team = team
         
     def __str__(self):
-        return f"{self.name} - ({self.age}) [{self.team}]"
+        return f"{self.name} ({self.age})({self.team})"
         
 
 class SwimerEventTimes:
@@ -29,7 +29,7 @@ class SwimerEventTimes:
     self.most_recent_date = most_recent_date  
     self.event = event   
   def __str__(self):
-    return f"{self.swimmer}- seed time({self.seed_time}) latest time({self.most_recent_time})"
+    return f"{self.swimmer} -- seed: \"{self.seed_time}\" latest: \"{self.most_recent_time}\""
     
     
 # timeEntry = SwimerEventTimes(str(uuid.uuid1()), Swimmer("name", "age", "team"), "1:11.11", '1/1/24', "1:11.11", '1/1/24', Event("50 Free", "11-12", "Boys")))

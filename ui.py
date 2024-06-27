@@ -32,6 +32,8 @@ class App(tk.Frame):
         self.file_path.pack()
         self.import_button = tk.Button(root, text="Import File", command=self.import_file)
         self.import_button.pack()
+
+        
         
         # self.load_times_button = tk.Button(root, text="Submit", command=self.load_swim_times)
         # self.load_times_button.pack(pady=25)
@@ -51,38 +53,47 @@ class App(tk.Frame):
         path = filedialog.askopenfilename(title="Select a file", filetypes=[("pdf files", "*.pdf"), ("cvs files", "*.csv*")])
         
         self.file_path.config(text = path.split('/').pop())
-        self.open_import_window(path)
+        data = load_race_data(path)
+        self.times_by_event = []
+        for k, g in itertools.groupby(data , lambda x: x.event):
+           self.times_by_event.append((k, list(g)))
+        self.open_import_window()
         
-    def open_import_window(self, path):
-        print(path)
-        self.data = load_race_data(path)
+    def open_import_window(self):
         # Create secondary (or popup) window.
         secondary_window = tk.Toplevel()
         secondary_window.title("Import Times")
-        secondary_window.config(width=300, height=200)
-        # Create a button to close (destroy) this window.
-        times_by_event = {}
-        for k, g in itertools.groupby(self.data , lambda x: x.event):
-            times_by_event[k] = list(g)
-            
-        for x, y in times_by_event.items():
-            event = tk.Label(secondary_window, text="event: {}".format(str(x)))
-            event.pack()
-            for time in y:
-                time = tk.Label(secondary_window, text=str(time))
-                time.pack()
-            
+        secondary_window.geometry('450x400')
+        
+        # Create a button to close (destroy) this window            
+        x = self.times_by_event[0]
+        
+        event = tk.Label(secondary_window, text="{} - {} times recorded".format(str(x[0]), len(x[1])))
+        event.grid(row=0, column=0, columnspan=4)
+        yScroll = tk.Scrollbar(secondary_window, orient=tk.VERTICAL)
+        yScroll.grid(row=1, column=2, sticky=tk.N+tk.S)
+        listbox = tk.Listbox(secondary_window, width=65, height=20,
+            yscrollcommand=yScroll.set)
+        listbox.grid(row=1, column=1, sticky=tk.N+tk.S+tk.E+tk.W)
+        yScroll.config(command = listbox.yview) 
+        
+        # Insert elements into the listbox'
+        # listbox.insert(tk.END, "Name --- Age --- Team --- Seed --- Official") 
+        for time in x[1]: 
+             listbox.insert(tk.END, str(time))
+            # listbox.insert(tk.END, f"{time.swimmer.name} --- {time.swimmer.age} --- {time.swimmer.team} --- {time.seed_time} --- {time.most_recent_time}") 
+        
             
             
         button_close = tk.Button(
             secondary_window,
-            text="Close window",
+            text="upload",
             command=self.update_times
         )
-        button_close.place(x=75, y=75)
+        button_close.grid(row=5,column=1)
         
     def update_times(self):
-        update_swim_times(self.data)
+        self.times_by_event.pop(0)
         
 
 root = tk.Tk()
