@@ -24,7 +24,7 @@ def export_swim_times(path, swim_times):
     data_folder = Path(path)
     file_to_save = data_folder / f"Swim_Results_{date.year}_{date.month}_{date.day}.xlsx"
     workbook = xlsxwriter.Workbook(file_to_save)
-
+    cell_format = workbook.add_format({'bold': True, 'font_color': 'blue'})
     times_by_age_and_gender = {}
     for x in swim_times:
         group = f"{x.event.gender}, {x.event.age_group}"
@@ -61,7 +61,10 @@ def export_swim_times(path, swim_times):
             row = 2
             for time in times_by_races[race]: 
                 for index, rowData in enumerate(time.get_excel_row()):
-                    worksheet.write(row, initial_column+index, rowData)  # time entries
+                    if time.racer.team == "HOW": #special format for Hills of Walden 
+                        worksheet.write(row, initial_column+index, rowData, cell_format)  # time entries
+                    else:
+                        worksheet.write(row, initial_column+index, rowData)  # time entries
                 row += 1                     
 
             initial_column += 9
