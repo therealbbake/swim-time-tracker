@@ -1,0 +1,3 @@
+([('ui',
+   '/Users/bbaker/Documents/GitHub/swim-time-tracker/src/dist/ui',
+   'EXECUTABLE')],)
