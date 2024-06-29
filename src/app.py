@@ -1,6 +1,7 @@
 # import tkinter as tk
 
 import tkinter as tk
+from tkinter import ttk 
 from tkinter import filedialog
 from db.dataAccess import update_swim_times, backup_db, retrieve_row_count, retrieve_all
 from helpers.pfd_parser import load_race_data
@@ -9,19 +10,6 @@ import itertools
 
 import sys; print(sys.executable)
 
-def open_secondary_window():
-    # Create secondary (or popup) window.
-    secondary_window = tk.Toplevel()
-    secondary_window.title("Secondary Window")
-    secondary_window.config(width=300, height=200)
-    # Create a button to close (destroy) this window.
-    button_close = tk.Button(
-        secondary_window,
-        text="Close window",
-        command=secondary_window.destroy
-    )
-    button_close.place(x=75, y=75)
-    
 
 
 
@@ -48,10 +36,6 @@ class App(tk.Frame):
         
         self.meet_date = tk.Label(self.meet_info, text="Date: ")
         self.meet_date.pack()
-        self.event_count = tk.Label(self.meet_info, text="Events Found: ")
-        self.event_count.pack()
-        self.audit_time_button = tk.Button(self.meet_info, text="Audit", command=self.open_import_window)
-        self.audit_time_button.pack()
         self.save_time_button = tk.Button(self.meet_info, text="Save Event Data", command=self.save_data)
         self.save_time_button.pack()
  
@@ -76,11 +60,23 @@ class App(tk.Frame):
         self.meet_info.pack(expand='yes', fill='both')
         self.meet_date.config(text = f"Event Date: {data['date']}")
         
-        self.times_by_event = []
-        for k, g in itertools.groupby(data['times'] , lambda x: x.event):
-           self.times_by_event.append((k, list(g)))
-           
-        self.event_count.config(text = f"Events Found: {len(self.times_by_event)}")
+        self.times_by_age_and_gender = {}
+        for x in data['times']:
+            group = f"{x.event.gender}, {x.event.age_group}"
+            if group in self.times_by_age_and_gender:
+                self.times_by_age_and_gender[group].append(x)
+            else: 
+                self.times_by_age_and_gender[group] = [x]
+        for key in self.times_by_age_and_gender:
+            def open_results(x = key):
+                self.open_import_window(x)
+                
+            ttk.Button(self.meet_info, text=f"{key} Results", command=open_results ).pack()
+            
+        # self.times_by_event = []
+        # for k, g in itertools.groupby(data['times'] , lambda x: x.event):
+        #    self.times_by_event.append((k, list(g)))
+        # self.event_count.config(text = f"Events Found: {len(self.times_by_event)}")
         
     #     {
     #     "meet_info": meet_info,
@@ -88,38 +84,64 @@ class App(tk.Frame):
     #     "date": meet_date,
     # }\
         
-    def open_import_window(self):
+    def open_import_window(self, key):
         # Create secondary (or popup) window.
         secondary_window = tk.Toplevel()
         secondary_window.title("Import Times")
         secondary_window.geometry('450x400')
         
-        # Create a button to close (destroy) this window            
-        x = self.times_by_event[0]
+        tabControl = ttk.Notebook(secondary_window) 
+        times_by_event = []
+        for k, g in itertools.groupby(self.times_by_age_and_gender[key], lambda x: x.event):
+                times_by_event.append((k, list(g)))
+  
+        for event in times_by_event:
+            tab = tk.Frame(tabControl)
+            tabControl.add(tab, text =event[0].race) 
+            event_label = tk.Label(tab, text="{} - {} times recorded".format(str(event[0].race), len(event[1])))        
+            event_label.grid(row=0, column=0, columnspan=4)
+            yScroll = tk.Scrollbar(tab, orient=tk.VERTICAL)
+            yScroll.grid(row=1, column=2, sticky=tk.N+tk.S)
+            listbox = tk.Listbox(tab, width=65, height=20,
+                yscrollcommand=yScroll.set)
+            listbox.grid(row=1, column=1, sticky=tk.N+tk.S+tk.E+tk.W)
+            yScroll.config(command = listbox.yview) 
+            # Insert elements into the listbox'
+            # listbox.insert(tk.END, "Name --- Age --- Team --- Seed --- Official") 
+            for time in event[1]: 
+                listbox.insert(tk.END, str(time))
+                # listbox.insert(tk.END, f"{time.swimmer.name} --- {time.swimmer.age} --- {time.swimmer.team} --- {time.seed_time} --- {time.most_recent_time}") 
+            
         
-        event = tk.Label(secondary_window, text="{} - {} times recorded".format(str(x[0]), len(x[1])))
-        event.grid(row=0, column=0, columnspan=4)
-        yScroll = tk.Scrollbar(secondary_window, orient=tk.VERTICAL)
-        yScroll.grid(row=1, column=2, sticky=tk.N+tk.S)
-        listbox = tk.Listbox(secondary_window, width=65, height=20,
-            yscrollcommand=yScroll.set)
-        listbox.grid(row=1, column=1, sticky=tk.N+tk.S+tk.E+tk.W)
-        yScroll.config(command = listbox.yview) 
+        tabControl.pack(expand = 1, fill ="both")   
+        # tab2 = ttk.Frame(tabControl) 
         
-        # Insert elements into the listbox'
-        # listbox.insert(tk.END, "Name --- Age --- Team --- Seed --- Official") 
-        for time in x[1]: 
-             listbox.insert(tk.END, str(time))
-            # listbox.insert(tk.END, f"{time.swimmer.name} --- {time.swimmer.age} --- {time.swimmer.team} --- {time.seed_time} --- {time.most_recent_time}") 
+        # tabControl.add(tab2, text ='Tab 2') 
+        # tabControl.pack(expand = 1, fill ="both") 
         
+        # ttk.Label(tab1,  
+        #         text ="Welcome to \ 
+        #         GeeksForGeeks").grid(column = 0,  
+        #                             row = 0, 
+        #                             padx = 30, 
+        #                             pady = 30)   
+        # ttk.Label(tab2, 
+        #         text ="Lets dive into the\ 
+        #         world of computers").grid(column = 0, 
+        #                                     row = 0,  
+        #                                     padx = 30, 
+        #                                     pady = 30) 
+
+        
+       
             
             
-        button_close = tk.Button(
-            secondary_window,
-            text="upload",
-            command=self.update_times
-        )
-        button_close.grid(row=5,column=1)
+        # button_close = tk.Button(
+        #     secondary_window,
+        #     text="upload",
+        #     command=self.update_times
+        # )
+        # button_close.grid(row=5,column=1)
         
     def update_times(self):
         self.times_by_event.pop(0)
