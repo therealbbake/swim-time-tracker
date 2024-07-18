@@ -4,7 +4,8 @@ import tkinter as tk
 from tkinter import ttk 
 from tkinter import filedialog
 from db.dataAccess import update_swim_times, backup_db, retrieve_row_count, retrieve_all
-from helpers.pfd_parser import load_race_data
+import helpers.pfd_parser  as pdf
+import helpers.csv_parser  as csv
 from helpers.xlxs_export import export_swim_times
 import itertools
 
@@ -50,10 +51,11 @@ class App(tk.Frame):
         self.export_time_button.config(text = f"Export {updated_db_count} times")
         
     def import_file(self):
-        path = filedialog.askopenfilename(title="Select a file", filetypes=[("pdf files", "*.pdf"), ("cvs files", "*.csv*")])
+        path = filedialog.askopenfilename(title="Select a file", filetypes=[("pdf files", "*.pdf"), ("cvs files", "*.csv")])
 
         self.file_path.config(text = path.split('/').pop())
-        data = load_race_data(path)
+        
+        data = pdf.load_race_data(path) if '.pdf' in path else csv.load_race_data(path)
         self.race_times = data['times']
         self.meet_info.config(text = data['meet_info'])
         self.meet_info.place(x=100, y=100)
@@ -62,6 +64,7 @@ class App(tk.Frame):
         
         self.times_by_age_and_gender = {}
         for x in data['times']:
+            print(x)
             group = f"{x.event.gender}, {x.event.age_group}"
             if group in self.times_by_age_and_gender:
                 self.times_by_age_and_gender[group].append(x)

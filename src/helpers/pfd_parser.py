@@ -2,11 +2,13 @@
 import pypdfium2 as pdfium
 import uuid 
 from models import *
+from datetime import datetime
 
-skip_reasons = ['DQ', 'DNF', 'DFS', 'NS']
+skip_reasons = ['DQ', 'DNF', 'DFS', 'NS', 'SCR']
 # convert race times to a common format
 def format_time(time):
-    if(time == "NT"):
+    print(time)
+    if(time == "NT" or time == None):
         return time
     elif(":" in time): 
         d = time.split(":")
@@ -36,6 +38,7 @@ def parse_conference_PDF(pages):
     race_times = []
     meet_date = ''
     meet_info = ''
+    
     for page in pages: 
         textpage = page.get_textpage().get_text_bounded(left=None, bottom=None, right=None, top=None, errors='ignore')
         page_lines = textpage.split('\n')
@@ -106,23 +109,34 @@ def parse_conference_PDF(pages):
 
 def parse_meet_PDF(pages):
     race_times = []
-    meet_date = ''
-    meet_info = ''
+    meet_date = datetime.now()
+    meet_info = 'Swim Meet Results'
     for page in pages: 
         textpage = page.get_textpage().get_text_bounded(left=None, bottom=None, right=None, top=None, errors='ignore')
         page_lines = textpage.split('\n')
+        print(page_lines)
         # retieve data of the meet
-        title = page_lines[len(page_lines) -2].split(' ')
-        meet_date = title.pop(0).strip(',')
-        del title[:2]
-        del title[-4:]
-        meet_info = ' '.join(title)
-        del page_lines[-3:]
-        page_lines.pop(0)
+        # title = page_lines[len(page_lines) -2].split(' ')
+        # meet_date = title.pop(0).strip(',')
+        # del title[:2]
+        # del title[-4:]
+        # meet_info = ' '.join(title)
+        # del page_lines[-3:]
+        # page_lines.pop(0)
         # loop through pages
+        isTimeSection = False
+        containsSeedTime = False
         for x in page_lines:
+            print(x)
+            print(len(x))
             x.replace('\\n', '')
-            if(x.startswith('#')): # retrieves Event Data
+            if('Pl' in x):
+                isTimeSection = True
+                containsSeedTime = 'Seed' in x
+                continue
+            if('Maestro' in x or 'DQ' in x or 'swimtopia' in x or 'Results' in x or len(x.split(' ')) <= 1): # un needed lines
+                continue
+            elif(x.startswith('#')): # retrieves Event Data
                 print(x)
                 is_relay = 'Relay' in x
                 
@@ -137,11 +151,10 @@ def parse_meet_PDF(pages):
                     
                 race = build_race_name(race_info)
                 current_event = Event(race, age_group, gender)
-            elif('Preliminaries' in x or 'Final' in x or 'Team' in x or 'Swim-Off' in x or 'Swim-off' in x): # un needed lines
-                continue
-            elif(is_relay):
+                isTimeSection = False
+            elif(is_relay and isTimeSection):
                 swimmer_time = x.split(' ')
-                if( swimmer_time[0] == '1)' or swimmer_time[0] == '3)'):
+                if(not (swimmer_time[0] == 'X' or swimmer_time[0] == '--' or swimmer_time[0].isnumeric())):
                     continue
                 placement = swimmer_time.pop(0) # remove placement
                 if( placement.isnumeric() and int(placement) == 1): # remove points scored
@@ -149,7 +162,8 @@ def parse_meet_PDF(pages):
                 time = swimmer_time.pop().strip() # grab official time\
                 if any(reason in time for reason in skip_reasons): # skip storing events
                     continue
-                seed_time = swimmer_time.pop().strip()
+                
+                seed_time = swimmer_time.pop().strip() if containsSeedTime else None
                 team = swimmer_time.pop()
                 group = swimmer_time.pop()
                 swim_entry = SwimerEventTimes(str(uuid.uuid1()), 
@@ -161,15 +175,20 @@ def parse_meet_PDF(pages):
                     current_event) # current Event
     
                 race_times.append(swim_entry)
-            else:
+            elif(isTimeSection):
                 swimmer_time = x.split(' ')
                 placement = swimmer_time.pop(0) # remove placement
+                if(not (placement == 'X' or placement == '--' or placement.isnumeric())):
+                    continue
                 if( placement.isnumeric() and int(placement) < 7): # remove points scored
                     swimmer_time.pop()
+                    
+                if (len(swimmer_time) < 5):
+                    continue
                 official_time = swimmer_time.pop().strip() # grab official time
                 if any(reason in official_time for reason in skip_reasons): # skip storing events
                     continue
-                seed_time = swimmer_time.pop().strip()
+                seed_time = swimmer_time.pop().strip() if containsSeedTime else None 
                 team = swimmer_time.pop()
                 age = swimmer_time.pop()
                 name = ' '.join(swimmer_time)

@@ -8,7 +8,7 @@ from pathlib import Path
 
 # initializing the DB 
 conn = sqlite3.connect(':memory:')
-data_folder = Path("db")
+data_folder = Path("src/db")
 file_to_open = data_folder / "database.csv"
 df = pandas.read_csv(file_to_open)
 df.to_sql('swim_times', conn, if_exists='append', index=False)
@@ -41,7 +41,7 @@ def retrieve_row_count():
     return res.fetchall()[0][0]
 
 def convert_time_to_milis(time):
-    if time == "NT":
+    if (time == "NT" or time == None):
         return  99999.9999
     if(":" in time): 
         d = time.split(":")
