@@ -8,14 +8,14 @@ from pathlib import Path
 
 # initializing the DB 
 conn = sqlite3.connect(':memory:')
-data_folder = Path("src/db")
-file_to_open = data_folder / "database.csv"
-df = pandas.read_csv(file_to_open)
+data_folder = Path("db")
+db_back_up = "src\db\database.csv"
+df = pandas.read_csv(db_back_up)
 df.to_sql('swim_times', conn, if_exists='append', index=False)
 
 def backup_db():
     db_df = pandas.read_sql_query("SELECT * FROM swim_times", conn)
-    db_df.to_csv(data_folder / "database.csv", index=False)
+    db_df.to_csv(db_back_up, index=False)
 
 def retrieve_all():
     res = cur.execute("SELECT * FROM swim_times")
@@ -59,6 +59,7 @@ def convert_time_to_milis(time):
     
 def update_swim_times(times):
     rows_to_insert = []
+    update_count = 0
     for time_entry in times: 
         if str(time_entry.event) == '200m Medley Relay': 
             print(time_entry)
@@ -72,6 +73,7 @@ def update_swim_times(times):
             cur.execute(""" UPDATE swim_times
             SET Last_Time = ?, Last_Update_Time= ?, Age = ?, Age_Group = ?, Seed_Time = ?, Seed_Update_Time = ?
             WHERE Id = ?;""",(time_entry.most_recent_time, time_entry.most_recent_date, time_entry.racer.age, time_entry.event.age_group, seed_data[0], seed_data[1], record_id))
+            update_count += 1
         else: # create Brand new Swimmer Event time entry 
             rows_to_insert.append((time_entry.record_id, 
                 time_entry.racer.name, 
@@ -84,8 +86,8 @@ def update_swim_times(times):
                 time_entry.event.race, 
                 time_entry.event.gender, 
                 time_entry.event.age_group))
-    print(rows_to_insert)
     cur.executemany(sql, rows_to_insert)
+    return(len(rows_to_insert), update_count)
         
 def get_new_seed_time(existing_seed, time_entry):
     lowest_time = existing_seed

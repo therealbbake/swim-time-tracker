@@ -35,6 +35,8 @@ class App(tk.Frame):
         # This will create a LabelFrame
         self.meet_info = tk.LabelFrame(root)
         
+        self.meet_save_status = tk.Label(self.meet_info, text="Meet Data is Unsaved")
+        self.meet_save_status.pack()
         self.meet_date = tk.Label(self.meet_info, text="Date: ")
         self.meet_date.pack()
         self.save_time_button = tk.Button(self.meet_info, text="Save Event Data", command=self.save_data)
@@ -46,35 +48,45 @@ class App(tk.Frame):
         export_swim_times(path, swim_times)
 
     def save_data(self):
-        update_swim_times(self.race_times)
-        updated_db_count = retrieve_row_count()
-        self.export_time_button.config(text = f"Export {updated_db_count} times")
+        try:
+            saved_info = update_swim_times(self.race_times)
+            self.meet_save_status.config(text = f"Successfuly Inserted: {saved_info[0]} Times, Update: {saved_info[1]} Times")
+            updated_db_count = retrieve_row_count()
+            self.export_time_button.config(text = f"Export {updated_db_count} times")
+        except Exception as error: 
+            print(f"Failed to update with Error: \n {error}")
+            self.meet_save_status.config(text = f"Failed to Update Swim Times with Meet Data")
+        
         
     def import_file(self):
-        path = filedialog.askopenfilename(title="Select a file", filetypes=[("pdf files", "*.pdf"), ("cvs files", "*.csv")])
+        path = filedialog.askopenfilename(title="Select a file", filetypes=[("pdf files", "*.pdf"), ("cvs files", "*.csv")])# add for CSV support 
 
         self.file_path.config(text = path.split('/').pop())
+        try:
+            self.data = pdf.load_race_data(path) if '.pdf' in path else csv.load_race_data(path)
+            self.file_path.config(text = path.split('/').pop())
+            self.race_times = self.data['times']
+            self.meet_info.config(text = f" {self.data['meet_info']}")
+            self.meet_info.place(x=100, y=100)
+            self.meet_info.pack(expand='yes', fill='both')
+            self.meet_date.config(text = f"Event Date: {self.data['date']}")
         
-        data = pdf.load_race_data(path) if '.pdf' in path else csv.load_race_data(path)
-        self.race_times = data['times']
-        self.meet_info.config(text = data['meet_info'])
-        self.meet_info.place(x=100, y=100)
-        self.meet_info.pack(expand='yes', fill='both')
-        self.meet_date.config(text = f"Event Date: {data['date']}")
+            self.times_by_age_and_gender = {}
+            for x in self.data['times']:
+                group = f"{x.event.gender}, {x.event.age_group}"
+                if group in self.times_by_age_and_gender:
+                    self.times_by_age_and_gender[group].append(x)
+                else: 
+                    self.times_by_age_and_gender[group] = [x]
+            for key in self.times_by_age_and_gender:
+                def open_results(x = key):
+                    self.open_import_window(x)
+                    
+                ttk.Button(self.meet_info, text=f"{key} Results", command=open_results ).pack()
+        except Exception as error:
+            print(f"Failed to Load Data with Error: \n {error}")
+            self.file_path.config(text = f"Failed to Load Swim Times for {path.split('/').pop()}")
         
-        self.times_by_age_and_gender = {}
-        for x in data['times']:
-            print(x)
-            group = f"{x.event.gender}, {x.event.age_group}"
-            if group in self.times_by_age_and_gender:
-                self.times_by_age_and_gender[group].append(x)
-            else: 
-                self.times_by_age_and_gender[group] = [x]
-        for key in self.times_by_age_and_gender:
-            def open_results(x = key):
-                self.open_import_window(x)
-                
-            ttk.Button(self.meet_info, text=f"{key} Results", command=open_results ).pack()
             
         # self.times_by_event = []
         # for k, g in itertools.groupby(data['times'] , lambda x: x.event):

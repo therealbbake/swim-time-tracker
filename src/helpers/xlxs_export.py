@@ -2,7 +2,6 @@
 import pandas as pd
 from db.dataAccess import retrieve_all
 from pathlib import Path
-import itertools
 import datetime
 import xlsxwriter
 
