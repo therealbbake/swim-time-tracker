@@ -2,14 +2,14 @@ import pypdfium2 as pdfiumss
 import sqlite3
 import pandas
 import datetime
-from models import *
+from d import *
 from pathlib import Path
 
 
 # initializing the DB 
 conn = sqlite3.connect(':memory:')
 data_folder = Path("db")
-db_back_up = "src\db\database.csv"
+db_back_up = "src/db/database.csv"
 df = pandas.read_csv(db_back_up)
 df.to_sql('swim_times', conn, if_exists='append', index=False)
 

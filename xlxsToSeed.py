@@ -1,6 +1,6 @@
 import pandas 
 import csv
-from src.models import *
+from d import *
 import uuid
 
 def build_race_name(race_info):
