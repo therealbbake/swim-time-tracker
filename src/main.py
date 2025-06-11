@@ -4,7 +4,10 @@ from tkinter import ttk
 from models.mod import *
 from view.SwimmerSearch import SwimmerSearch
 from view.PDFImportWindow import PDFImport
-from db.db import DataAccess
+from view.TeamView import TeamView
+from db.DataAccess import DataAccess
+import helpers.Exporter as Exporter
+from helpers.Logger import LOGGER
 
 # Sets the appearance mode of the application
 # "System" sets the appearance same as that of the system
@@ -13,8 +16,6 @@ set_appearance_mode("System")
 # Sets the color of the widgets
 # Supported themes: green, dark-blue, blue
 set_default_color_theme("green")    
-
-
 
 class App(CTk):
     def shutdown(self):
@@ -26,7 +27,7 @@ class App(CTk):
         self.geometry("600x500")
         self.title("Swim Time Tracker")
         self.iconbitmap('src/resources/swimmer.ico')
-    
+        LOGGER.info("Swim track starting up!")
         # add widgets to app
         
         self.header = CTkFrame(self, fg_color="transparent")
@@ -42,12 +43,8 @@ class App(CTk):
         self.teams.pack(side=LEFT)
         
         self.team_buttons = []
-        for team in self.dataAccess.get_swim_teams():
-            def open_team_window(x = team):
-                self.team_button(x)
-            # () => team_button(team) 
-            team_button = CTkButton(self.teams, text=team, command=open_team_window )
-            team_button.pack(pady=5)
+        self.create_teams_list() 
+
         
         
         
@@ -55,11 +52,13 @@ class App(CTk):
         self.section2 = CTkFrame(self, fg_color="transparent")
         self.section2.pack(side=BOTTOM)
         self.import_button = CTkButton(self.section2 , text="Import", command=self.import_file)
-        self.export_button = CTkButton(self.section2 , text="Export", command=self.button_click)
+        self.export_button = CTkButton(self.section2 , text="Export", command=self.export_data)
         self.import_button.pack(side=LEFT, padx=15, pady=5)
         self.export_button.pack(side=RIGHT, padx=15, pady=5)
 
+        self.team_profile = None
         self.swimmer_lookup_window = None
+        self.import_window = None
         
     
         ###Treeview Customisation (theme colors are selected)
@@ -75,29 +74,39 @@ class App(CTk):
         
         
         
-        
+    def create_teams_list(self):
+        for team in self.dataAccess.get_swim_teams():
+            def open_team_window(x = team):
+                self.team_button(x)
+            # () => team_button(team) 
+            team_button = CTkButton(self.teams, text=team, command=open_team_window )
+            team_button.pack(pady=5)
         
         
 
     def team_button(self, value):
-        pass
+        if self.team_profile is None or not self.team_profile.winfo_exists():
+            self.team_profile = TeamView(team_code=value)  # create window if its None or destroyed
+        else:
+            self.team_profile.destroy()  # if window exists focus it   
+            self.team_profile = TeamView(team_code=value)  # create window if its None or destroyed
+            
+            
     # add methods to app
-    def button_click(self, value):
-        path = filedialog.askopenfilename(title="Select a file", filetypes=[("pdf files", "*.pdf"), ("cvs files", "*.csv")])# add for CSV support 
-        
-    def handle_swimmer_search(self, f, l):
-        print(f" {f}, {l}")
-        
+    def export_data(self):
+        path = filedialog.askdirectory()
+        Exporter.export_all_swimdata(self.dataAccess, path)
+
     def open_toplevel(self):
         if self.swimmer_lookup_window is None or not self.swimmer_lookup_window.winfo_exists():
             self.swimmer_lookup_window = SwimmerSearch(self)  # create window if its None or destroyed
         else:
             self.swimmer_lookup_window.focus()  # if window exists focus it   
 
-
+    # TODO add for CSV support
     def import_file(self):
-        if self.swimmer_lookup_window is None or not self.swimmer_lookup_window.winfo_exists():
-            self.import_path = filedialog.askopenfilename(title="Select a file", filetypes=[("pdf files", "*.pdf"), ("cvs files", "*.csv")])# add for CSV support
+        if self.import_window is None or not self.import_window.winfo_exists():
+            self.import_path = filedialog.askopenfilename(title="Select a file", filetypes=[("pdf files", "*.pdf")])
             
             if '.pdf' in self.import_path: 
                 self.import_window = PDFImport(self)
@@ -105,7 +114,7 @@ class App(CTk):
             #     self.import_window = PDFImportWindow(self)
             # self.data = PDFParser.load_race_data(path) else csv.load_race_data(path)
         else:
-            self.swimmer_lookup_window.focus()  # if window exists focus it   
+            self.import_window.focus()  # if window exists focus it   
 
 
 app = App()

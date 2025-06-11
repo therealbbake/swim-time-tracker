@@ -2,12 +2,10 @@
 import pypdfium2 as pdfium
 import uuid 
 import helpers.Utility as Utils
-from d import *
 from models.mod import *
-
 from datetime import datetime
-from db.db import DataAccess
-
+from db.DataAccess import DataAccess
+from helpers.Logger import LOGGER
 
 def process_individual_swimmer(swimmer_time, containsSeedTime, meet_date, race_type, age_group, gender, distance, score, isConference):
     placement = swimmer_time.pop(0) # remove placement
@@ -26,8 +24,6 @@ def process_individual_swimmer(swimmer_time, containsSeedTime, meet_date, race_t
     official_time = swimmer_time.pop().strip() # grab official time
     seed_time = swimmer_time.pop().strip() if containsSeedTime else None
     team = swimmer_time.pop()
-    if(team == 'A'):
-        print(f'swimmer A {swimmer_time}')
     age = swimmer_time.pop()
     full_name = ' '.join(swimmer_time)
     # create new Swimmer Event time entry 
@@ -59,6 +55,7 @@ def process_individual_swimmer(swimmer_time, containsSeedTime, meet_date, race_t
 
 
 def parse_conference_PDF(pages):
+    LOGGER.info("Entering PDFParser.parse_conference_PDF")  
     database = DataAccess()
     try:
         meet_date = ''
@@ -96,8 +93,6 @@ def parse_conference_PDF(pages):
                     distance = Utils.get_race_distance(race_info.pop(0))
                     race_type = get_race_type(race_info)
                 elif('Preliminaries' in x or 'Final' in x or 'Team' in x or 'Swim-Off' in x or 'Swim-off' in x or '(#' in x ): # un needed lines
-                    if '(#' in x:
-                        print(x)
                     continue
                 elif(is_relay):
                     swimmer_time = x.split(' ')
@@ -110,16 +105,13 @@ def parse_conference_PDF(pages):
                                 relay_teams[current_relay_id].append(swimmer_name)
                                 swimmer_name = ''
                             elif any(char.isdigit() for char in s):
-                                print(s)
                                 age = ''
                                 next_name = ''
                                 for char in s:
                                     if char.isdigit():
                                         age += char
                                     else:
-                                        next_name += char
-                                print(age)      
-                                print(next_name)      
+                                        next_name += char   
                                 swimmer_name += f" {age}" 
                                 relay_teams[current_relay_id].append(swimmer_name.strip())
                                 swimmer_name = f'{next_name}'
@@ -176,12 +168,17 @@ def parse_conference_PDF(pages):
             "relay_race_times": relay_race_times,
             "relay_teams": relay_teams
         }
+    except Exception as e:
+        LOGGER.error("Error occurred in PDFParser.parse_conference_PDF: %s", str(e))
     finally:
         database.close_connection()
+        LOGGER.info("Exiting PDFParser.parse_conference_PDF")  
 
 
 
 def parse_meet_PDF(pages):
+    
+    LOGGER.info("Entering PDFParser.parse_meet_PDF")  
     database = DataAccess()
     try:
         individual_race_times = []
@@ -252,8 +249,6 @@ def parse_meet_PDF(pages):
                     
                     seed_time = swimmer_time.pop().strip() if containsSeedTime else None
                     team = swimmer_time.pop()
-                    if('A' in team):
-                        print(swimmer_time)
                     group = swimmer_time.pop()
                     result = "Finished" if not any(reason in time for reason in Utils.skip_reasons) else time
                     time_in_milis = Utils.convert_time_to_seconds(time) if not any(reason in time for reason in Utils.skip_reasons) else None
@@ -295,11 +290,15 @@ def parse_meet_PDF(pages):
             "relay_race_times": relay_race_times,
             "relay_teams": relay_teams
         }
+    except Exception as e:
+        LOGGER.error("Error occurred in PDFParser.parse_meet_PDF: %s", str(e))
     finally:
         database.close_connection()
+        LOGGER.info("Exiting PDFParser.parse_meet_PDF")  
 
 
 def load_race_data(pdf):
+    LOGGER.info("Entering PDFParser.load_race_data with path: %s", pdf)  
     pages = pdfium.PdfDocument(pdf)
     searcher = pages[0].get_textpage().search("Northland Conference Championships", match_case=False, match_whole_word=False)
     if(searcher.get_next() != None): 

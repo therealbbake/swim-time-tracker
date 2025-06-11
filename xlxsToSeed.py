@@ -18,7 +18,6 @@ def get_gender(gender):
 swim_entries = [["Id","Name","Age","Team","Seed_Time","Seed_Update_Time","Last_Time","Last_Update_Time","Event","Gender","Age_Group"]]
     
 def format_time(time):
-    print(time)
     if(time == "NT"):
         return time
     elif(":" in time): 
@@ -59,11 +58,9 @@ for sheet in xl.sheet_names:
         for x in next(datareader, None):
             if "Unnamed" not in x: 
                 events.append(x)
-        print(events)
         next(datareader, None)  # remove headers
 
         for row in datareader:
-            print(row)
             event_counter = 0
             while len(events)-1 > event_counter:
                 entry = row[:7]

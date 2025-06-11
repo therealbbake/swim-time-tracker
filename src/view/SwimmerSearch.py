@@ -1,15 +1,21 @@
 from customtkinter import *
 from tkinter import *
+from tkinter import ttk
 from models.mod import *
-from db.db import DataAccess
-
+from db.DataAccess import DataAccess
+from view.SwimmerProfile import SwimmerProfile
+from helpers.Logger import LOGGER
 class SwimmerSearch(CTkToplevel):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        LOGGER.info("Entering SwimmerSearch")
+        self.bind("<<TreeviewSelect>>", self.handleSwimmerSelect)
         self.dataAccess: DataAccess = self.master.dataAccess
+        
+        self.swimmer_profile = None
         # self.handle_swimmer_search = handle_swimmer_search
-        self.geometry("500x300")
+        self.geometry("950x550")
         self.title("Swimmer Lookup")
         self.name_frame = CTkFrame(self, fg_color="transparent")
         self.name_frame.pack(side=TOP)
@@ -45,10 +51,14 @@ class SwimmerSearch(CTkToplevel):
         
         
         
-        
     
     def search_swimmer(self):
+        if hasattr(self, 'search_result'):
+            self.search_result.destroy()
         
+        
+        self.search_result = CTkFrame(self, width=800, height=500, fg_color="transparent")
+        self.search_result.pack()
         search_params = {
             'first_name': self.first_name_entry.get(), 
             'last_name': self.last_name_entry.get(), 
@@ -58,14 +68,31 @@ class SwimmerSearch(CTkToplevel):
         }
         swimmer_results = self.dataAccess.get_swimmers_by_query(search_params)
         
-        
-        
-        
-        
-        
-        # self.master.handle_swimmer_search("Bryan", "Baker")
-        # self.destroy()
-        
+        event_label = CTkLabel(self.search_result,font=('helvetica', 24), text="Search Results")        
+        event_label.pack(side=TOP)
+        columns = ['Racer']
+
+        self.treeview = ttk.Treeview(self.search_result, height=12, show='tree', displaycolumns='', columns=columns, selectmode='browse')
+        self.treeview.pack(side=LEFT, ipadx=200, ipady=20)
+
+        # create CTk scrollbar
+        ctk_textbox_scrollbar = CTkScrollbar(self.search_result, command=self.treeview.yview)
+        ctk_textbox_scrollbar.pack(side=RIGHT)
+        self.treeview.configure(yscrollcommand=ctk_textbox_scrollbar.set)
+        racer: Racer
+        for racer in swimmer_results: 
+            racer_item = self.treeview.insert("", END, text=racer, values=racer.get_db_row())
+    
+
+    def handleSwimmerSelect(self, arg):
+        vals = self.treeview.item(self.treeview.focus())['values']
+        selected_swimmer = Racer(vals[0],vals[1],vals[2],vals[3],vals[4],vals[5],vals[6])
+        if self.swimmer_profile is None or not self.swimmer_profile.winfo_exists():
+            self.swimmer_profile = SwimmerProfile(swimmer=selected_swimmer)  # create window if its None or destroyed
+        else:
+            self.swimmer_profile.focus()  # if window exists focus it   
+
+    
     def callback(self, P):
         if str.isdigit(P) or P == "":
             return True

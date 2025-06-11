@@ -2,13 +2,13 @@ from customtkinter import *
 from tkinter import *
 from tkinter import ttk
 from models.mod import *
-from db.db import DataAccess
+from db.DataAccess import DataAccess
 import helpers.PDFParser as PDFParser
 import traceback
 import itertools
 import uuid
 import re
-
+from helpers.Logger import LOGGER
 class PDFImport(CTkToplevel):
 
     def __init__(self, *args, **kwargs):
@@ -18,10 +18,11 @@ class PDFImport(CTkToplevel):
         self.geometry("950x950")
         self.title('Meet Results')
         self.resizable(False, True)
+        
+        LOGGER.info("Entering PDFImport with path: %s", path)   
         try:
             self.data = PDFParser.load_race_data(path)
             self.meet: Meet = self.data['meet']
-            print(self.meet.record_id)
             self.relay_teams = self.data['relay_teams'] 
             
             self.top_frame = CTkFrame(self, fg_color="transparent")
@@ -39,7 +40,6 @@ class PDFImport(CTkToplevel):
             self.bottom_frame = CTkFrame(self, fg_color="transparent")
             self.bottom_frame.pack(side=BOTTOM)
             isAlreadySaved = self.data['isAlreadySaved']
-            print(fr'{isAlreadySaved}')
             if self.data['isAlreadySaved']:
                 save_button = 'Event Already Saved'
                 button_state = 'disabled'
@@ -89,7 +89,7 @@ class PDFImport(CTkToplevel):
 
                 
         except Exception as error:
-            print(traceback.format_exc())
+            LOGGER.error("Exception occurred while parsing Meet data: %s \n %s", str(error), traceback.format_exc())
             self.error_loading = CTkLabel(self, text=f"Failed to build out meet data from PDF \n Failure Reason: \n {error}")
             self.error_loading.pack(pady=30)
            
@@ -136,7 +136,9 @@ class PDFImport(CTkToplevel):
     
     def save_results(self):
         try: 
-            meet_id = self.dataAccess.create_meet(self.meet)
+            LOGGER.info("entering PDFImportWindow.save_results")
+            meet_id = str(uuid.uuid1())
+            self.meet.record_id = meet_id
             self.dataAccess.add_meet_relation(self.meet.score.keys(), meet_id)
             events_by_id = self.dataAccess.get_all_events()
             swimmers_by_id = self.dataAccess.get_swimmers_for_teams(list(self.meet.score.keys()))
@@ -159,15 +161,14 @@ class PDFImport(CTkToplevel):
                         race_entry: IndividualSwimEntry = race_entry 
                         swimmer = Racer(None,race_entry.racer_fname, race_entry.racer_lname, race_entry.racer_age, race_entry.racer_team, race_entry.gender, False)
                         racer_id = list(swimmers_by_id.keys())[list(swimmers_by_id.values()).index(swimmer)] if swimmer in list(swimmers_by_id.values()) else None
+                        # add in swimmer entry
                         if not racer_id:
                             racer_id = str(uuid.uuid1())
                             swimmer.record_id = racer_id
                             swimmers_by_id[racer_id] = swimmer
-                            print(f'adding swimmer to db {swimmer}')
-                            print(f'adding swimmer to db {swimmer}')
                             new_swimmers.append(swimmer)
                         
-                        race_times.append(RaceTime(None, racer_id, event_id, meet_id, race_entry.result, race_entry.time, race_entry.placement, race_entry.points, self.meet.meet_date))
+                        race_times.append(RaceTime(str(uuid.uuid1()), racer_id, event_id, meet_id, race_entry.result, race_entry.time, race_entry.placement, race_entry.points, self.meet.meet_date))
                  
                 for k, g in itertools.groupby(value['relay_race_times'], lambda x: (x.event_race_type.name, x.distance)):
                     event = RaceEvent(None, Stroke[k[0]], age_group, gender, k[1], True)
@@ -182,11 +183,11 @@ class PDFImport(CTkToplevel):
                         relay_entry: RelaySwimEntry = relay 
                         relay_racer = Racer(None,relay_entry.relay_group, relay_entry.relay_team, relay_entry.age_group, relay_entry.relay_team, relay_entry.gender,True)
                         relay_id = list(swimmers_by_id.keys())[list(swimmers_by_id.values()).index(relay_racer)] if relay_racer in list(swimmers_by_id.values()) else None
+                        # create Relay
                         if not relay_id:
                             relay_id = str(uuid.uuid1())
                             relay_racer.record_id = relay_id
                             swimmers_by_id[relay_id] = relay_racer
-                            print(f'adding swimmer to db {relay_racer}')
                             new_swimmers.append(relay_racer)
                         
                         
@@ -195,7 +196,7 @@ class PDFImport(CTkToplevel):
                         
                         team_breakdown = self.relay_teams[relay_entry.relay_id]
                         relay_swimmers = []
-                        print(team_breakdown)
+                        # Saves entry unique entry for specific relay teams and swimmer apart of it 
                         for s in team_breakdown: 
                             s = re.sub("[()]", "",str(s))
                             s_racer = str(s).strip().split(' ')
@@ -203,22 +204,28 @@ class PDFImport(CTkToplevel):
                             s_racer_name = ' '.join(s_racer).split(', ')
                             relay_swimmer = Racer(None, str(s_racer_name[1]).strip(), str(s_racer_name[0]).strip(), age, relay_entry.relay_team, race_entry.gender, False)
                             swimmer_id = list(swimmers_by_id.keys())[list(swimmers_by_id.values()).index(relay_swimmer)] if relay_swimmer in list(swimmers_by_id.values()) else None
+                            # add swimmers that havent been found
                             if not swimmer_id:
-                                print(f'not finding a swimmer id for {relay_swimmer}')
+                                swimmer_id = str(uuid.uuid1())
+                                relay_swimmer.record_id = swimmer_id
+                                swimmers_by_id[swimmer_id] = relay_swimmer
+                                new_swimmers.append(relay_swimmer)
+
                             relay_swimmers.append(swimmer_id)
                             
                         relay_teams.append(RelayTeamBreakDown(str(uuid.uuid1()), race_id, relay_id, relay_swimmers[0],relay_swimmers[1], relay_swimmers[2], relay_swimmers[3]))
-            
-            
+
             self.dataAccess.create_swimmers(new_swimmers)
             self.dataAccess.create_race_times(race_times)
             self.dataAccess.create_relay_breakdowns(relay_teams)
-            
+            self.dataAccess.create_meet(self.meet)
+            self.master.create_teams_list()
             self.destroy()
             
         except Exception as error:
-            print(traceback.format_exc())
+            LOGGER.error("Exception occurred while saving Meet data: %s \n %s", str(error), traceback.format_exc())
             self.error_loading = CTkLabel(self.bottom_frame, text=f"Failed to Save Meet Data \n Failure Reason: \n {error}")
             self.error_loading.pack(pady=30)
             self.save_time_button.pack(pady=10)
-            
+        finally:
+            LOGGER.info("exiting PDFImportWindow.save_results")

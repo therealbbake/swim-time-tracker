@@ -41,6 +41,12 @@ class RaceEvent:
     def get_db_row(self):
         return (self.record_id, self.raceType.name, self.age_group, self.gender.name, self.distance, self.is_relay)
     
+    def __str__(self):
+        if self.is_relay: 
+            return  f"{self.distance}M {self.raceType.name} Relay ({self.age_group})"
+        else:
+            return f"{self.distance}M {self.raceType.name} ({self.age_group})"
+    
          
 class Racer:
     def __init__(self, record_id, first_name, last_name, age, team, gender, is_relay):
@@ -53,7 +59,10 @@ class Racer:
         self.is_relay = is_relay
         
     def __str__(self):
-        return f"{self.first_name} {self.last_name} ({self.age})({self.team})"
+        if self.is_relay: 
+            return f"{self.last_name} {self.age} Relay Team {self.first_name}"
+        else:
+            return f"{self.first_name} {self.last_name} ({self.age})({self.team})"
     
     def __eq__(self, other):
         
@@ -101,12 +110,13 @@ class RaceTime:
         self.racer_id = racer_id # swimmer or relay team id
         self.event_id = event_id # event_id
         self.meet_id = meet_id # meet_id
-        self.result = result # time in Miliseconds or DQ 
-        self.result_time = result_time # time in Miliseconds or DQ 
+        self.result = result # results (DQ, FINISHED)
+        self.result_time = result_time # time in Seconds
         self.placement = placement # int 
         self.points_scored = points_scored # int  points scored for team 
         self.date: datetime = date # date Time was recorded
-    
+    def __str__(self):
+        return f"{self.placement} - {Utils.format_time(self.result_time)} - {self.date.strftime('%m/%d/%Y')}"
     def get_db_row(self):
         return (self.record_id, self.racer_id, self.event_id, self.meet_id, self.result, self.result_time, self.placement, self.points_scored, int(self.date.timestamp() * 1000))
         
