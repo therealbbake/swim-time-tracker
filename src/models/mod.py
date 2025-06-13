@@ -70,8 +70,8 @@ class Racer:
             return False
         if (self.last_name != other.last_name):
             return False
-        if (self.age != other.age):
-            return False
+        # if (self.age != other.age):
+        #     return False
         if (self.gender.value != other.gender.value):
             return False
         if (self.team != other.team):

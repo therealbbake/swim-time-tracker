@@ -15,7 +15,7 @@ class PDFImport(CTkToplevel):
         super().__init__(*args, **kwargs)
         path = self.master.import_path
         self.dataAccess: DataAccess = self.master.dataAccess 
-        self.geometry("950x950")
+        self.geometry("950x750")
         self.title('Meet Results')
         self.resizable(False, True)
         
@@ -143,6 +143,7 @@ class PDFImport(CTkToplevel):
             events_by_id = self.dataAccess.get_all_events()
             swimmers_by_id = self.dataAccess.get_swimmers_for_teams(list(self.meet.score.keys()))
             new_swimmers = []
+            aged_swimmers = []
             race_times = []
             relay_teams = []
             for key, value in self.times_by_age_and_gender.items():
@@ -161,12 +162,21 @@ class PDFImport(CTkToplevel):
                         race_entry: IndividualSwimEntry = race_entry 
                         swimmer = Racer(None,race_entry.racer_fname, race_entry.racer_lname, race_entry.racer_age, race_entry.racer_team, race_entry.gender, False)
                         racer_id = list(swimmers_by_id.keys())[list(swimmers_by_id.values()).index(swimmer)] if swimmer in list(swimmers_by_id.values()) else None
+                      
+                        
                         # add in swimmer entry
                         if not racer_id:
                             racer_id = str(uuid.uuid1())
                             swimmer.record_id = racer_id
                             swimmers_by_id[racer_id] = swimmer
                             new_swimmers.append(swimmer)
+                        else:
+                            existing_swimmer = swimmers_by_id[racer_id]
+                            if (abs(int(swimmer.age) - int(existing_swimmer.age)) == 1 and int(swimmer.age) > int(existing_swimmer.age)):
+                                print(f"updating swimmer age for {swimmer} - {existing_swimmer} ")
+                                swimmer.record_id = racer_id
+                                swimmers_by_id[racer_id] = swimmer
+                                aged_swimmers.append(swimmer)
                         
                         race_times.append(RaceTime(str(uuid.uuid1()), racer_id, event_id, meet_id, race_entry.result, race_entry.time, race_entry.placement, race_entry.points, self.meet.meet_date))
                  
@@ -210,12 +220,21 @@ class PDFImport(CTkToplevel):
                                 relay_swimmer.record_id = swimmer_id
                                 swimmers_by_id[swimmer_id] = relay_swimmer
                                 new_swimmers.append(relay_swimmer)
+                            else:
+                                existing_swimmer = swimmers_by_id[swimmer_id]
+                                if (abs(int(relay_swimmer.age) - int(existing_swimmer.age)) == 1 and int(relay_swimmer.age) > int(existing_swimmer.age)):
+                                    print(f"updating swimmer age for {relay_swimmer} - {existing_swimmer} ")
+                                    relay_swimmer.record_id = swimmer_id
+                                    swimmers_by_id[swimmer_id] = relay_swimmer
+                                    aged_swimmers.append(relay_swimmer)
 
                             relay_swimmers.append(swimmer_id)
                             
                         relay_teams.append(RelayTeamBreakDown(str(uuid.uuid1()), race_id, relay_id, relay_swimmers[0],relay_swimmers[1], relay_swimmers[2], relay_swimmers[3]))
 
             self.dataAccess.create_swimmers(new_swimmers)
+            # updating swimmers who have aged up by one 
+            self.dataAccess.replace_swimmers(aged_swimmers)
             self.dataAccess.create_race_times(race_times)
             self.dataAccess.create_relay_breakdowns(relay_teams)
             self.dataAccess.create_meet(self.meet)
@@ -224,6 +243,7 @@ class PDFImport(CTkToplevel):
             
         except Exception as error:
             LOGGER.error("Exception occurred while saving Meet data: %s \n %s", str(error), traceback.format_exc())
+            print("Exception occurred while saving Meet data: %s \n %s", str(error), traceback.format_exc())
             self.error_loading = CTkLabel(self.bottom_frame, text=f"Failed to Save Meet Data \n Failure Reason: \n {error}")
             self.error_loading.pack(pady=30)
             self.save_time_button.pack(pady=10)

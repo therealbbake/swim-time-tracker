@@ -26,7 +26,7 @@ class App(CTk):
         self.dataAccess = DataAccess()
         self.geometry("600x500")
         self.title("Swim Time Tracker")
-        self.iconbitmap('src/resources/swimmer.ico')
+        # self.iconbitmap('src/resources/swimmer.ico')
         LOGGER.info("Swim track starting up!")
         # add widgets to app
         

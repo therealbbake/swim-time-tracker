@@ -4,6 +4,23 @@ from helpers.Logger import LOGGER
 from datetime import datetime
 import uuid 
 import shutil
+from os import path
+import sys, os
+frozen = 'not'
+if getattr(sys, 'frozen', False):
+    # we are running in a bundle
+    frozen = 'ever so'
+    bundle_dir = sys._MEIPASS
+else:
+    # we are running in a normal Python environment
+    bundle_dir = os.path.dirname(os.path.abspath(__file__))
+print( 'we are',frozen,'frozen')
+print( 'bundle dir is', bundle_dir )
+print( 'sys.argv[0] is', sys.argv[0] )
+print( 'sys.executable is', sys.executable )
+print( 'os.getcwd is', os.getcwd() )
+path_to_db = path.abspath(path.join(bundle_dir, 'swimtracker.sqlite3'))
+print(path_to_db)
 
 meet_db = """
     CREATE TABLE IF NOT EXISTS "meet" (
@@ -43,10 +60,10 @@ swimmer_db = """
         "team"	varchar(255),
         "gender"	int,
         "is_relay"	BOOL,
-        PRIMARY KEY("record_id"),
-        CONSTRAINT "uniqueSwimmer" UNIQUE("first_name","last_name","team","gender","age")
+        PRIMARY KEY("record_id")
     )
 """
+        # CONSTRAINT "uniqueSwimmer" UNIQUE("first_name","last_name","team","gender","age")
 raceTimes_db = """
     CREATE TABLE IF NOT EXISTS "times" (
         "record_id"	varchar(255),
@@ -80,7 +97,9 @@ relay_breakdown_db = """
 
 class DataAccess:
     def __init__(self):
-        self.connection = sqlite3.connect('src/db/swimtracker.sqlite3')
+        print('path_to_db')
+        print(path_to_db)
+        self.connection = sqlite3.connect(path_to_db)
         self.create_tables()
         
     def backup_db(self):
@@ -216,6 +235,21 @@ class DataAccess:
                 newRows.append(s.get_db_row())
             #(record_id, self.first_name, self.last_name, self.age, self.team, self.gender.name, self.is_relay)
             cur.executemany("INSERT INTO swimmers VALUES(?, ?, ?, ?, ?, ?, ?)", newRows)
+        except Exception as error:
+            self.connection.rollback()
+            raise error
+        finally:
+            self.connection.commit() 
+            cur.close()
+    
+    def replace_swimmers(self, swimmers: list):
+        cur = self.connection.cursor()
+        try:
+            newRows = []
+            for s in swimmers: 
+                newRows.append(s.get_db_row())
+            #(record_id, self.first_name, self.last_name, self.age, self.team, self.gender.name, self.is_relay)
+            cur.executemany("REPLACE INTO swimmers VALUES(?, ?, ?, ?, ?, ?, ?)", newRows)
         except Exception as error:
             self.connection.rollback()
             raise error
