@@ -238,6 +238,7 @@ team_names = [
     "RL",
     "CL",
     "NM",
+    "WC",
 ]
 
 
@@ -252,6 +253,8 @@ def get_gender(gender):
     
 def get_race_type(event):
     race_info = ' '.join(str(r) for r in event).replace('Freestyle', 'Free').replace('Breaststroke', 'Breast').replace('Backstroke', 'Back').replace('Butterfly', 'Fly').strip()
+    
+    print(race_info)
     if 'Medley' in race_info or 'IM' in race_info:
         return Stroke.Medley
     if 'Free' in race_info:

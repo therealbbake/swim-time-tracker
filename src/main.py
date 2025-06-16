@@ -75,12 +75,17 @@ class App(CTk):
         
         
     def create_teams_list(self):
+        t: CTkButton
+        for t in self.team_buttons:
+            t.destroy()
+            
         for team in self.dataAccess.get_swim_teams():
             def open_team_window(x = team):
                 self.team_button(x)
             # () => team_button(team) 
             team_button = CTkButton(self.teams, text=team, command=open_team_window )
             team_button.pack(pady=5)
+            self.team_buttons.append(team_button)
         
         
 

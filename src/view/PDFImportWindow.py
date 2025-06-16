@@ -22,9 +22,9 @@ class PDFImport(CTkToplevel):
         LOGGER.info("Entering PDFImport with path: %s", path)   
         try:
             self.data = PDFParser.load_race_data(path)
+            # print(self.data)
             self.meet: Meet = self.data['meet']
             self.relay_teams = self.data['relay_teams'] 
-            
             self.top_frame = CTkFrame(self, fg_color="transparent")
             self.top_frame.pack(side=TOP)
             self.meet_title = CTkLabel(self.top_frame, text= f"{self.meet.title}")
@@ -39,7 +39,6 @@ class PDFImport(CTkToplevel):
             
             self.bottom_frame = CTkFrame(self, fg_color="transparent")
             self.bottom_frame.pack(side=BOTTOM)
-            isAlreadySaved = self.data['isAlreadySaved']
             if self.data['isAlreadySaved']:
                 save_button = 'Event Already Saved'
                 button_state = 'disabled'
@@ -72,7 +71,18 @@ class PDFImport(CTkToplevel):
                         "individual_race_times": [x],
                         "relay_race_times": []
                     }               
-                    
+            if ('needs_attention' in self.data and len(self.data['needs_attention'])> 0):
+                self.textbox = CTkTextbox(master=self, width=900, corner_radius=0)
+                self.textbox.pack()
+                self.update_incor = CTkButton(master=self, text="Update Incorrect Entries", state='normal',  command=self.update_bad)
+                self.update_incor.pack()
+                
+                for i, x in enumerate(self.data['needs_attention']): 
+                    self.textbox.insert("0.0", f"{x}\n")
+                self.textbox.insert("0.0", f"---------------------------------------------------------------------------------------------------\n")
+                self.textbox.insert("0.0", f"Pl | LastName | FirstName | Age | TEAM | OfficialTime(xx.xx) | Pts(0 if none awarded) | GENDER | AGE_GROUP | Distance | Stroke\n")
+                self.textbox.insert("0.0", f"Swim Times needing Correction\n")
+            
             self.division = CTkFrame(self, fg_color="transparent")
             self.division.pack(side=LEFT)
             CTkLabel(self.division, text=f"Swimming Divisions").pack(pady=5, padx=5)
@@ -86,14 +96,12 @@ class PDFImport(CTkToplevel):
             self.division_result = CTkFrame(self, width=800, height=500, fg_color="transparent")
             self.division_result.pack(side=RIGHT)
 
-
-                
         except Exception as error:
             LOGGER.error("Exception occurred while parsing Meet data: %s \n %s", str(error), traceback.format_exc())
             self.error_loading = CTkLabel(self, text=f"Failed to build out meet data from PDF \n Failure Reason: \n {error}")
             self.error_loading.pack(pady=30)
            
-    def show_division_results(self, key):
+    def show_division_results(self, key):        
         if hasattr(self, 'tabview'):
             self.tabview.destroy()
             
@@ -101,16 +109,23 @@ class PDFImport(CTkToplevel):
         self.tabview.pack()
         
         
-        times_by_event = []
-        for k, g in itertools.groupby(self.times_by_age_and_gender[key]['individual_race_times'], lambda x: f"{x.distance}M {x.event_race_type.name}"):
-                times_by_event.append((k, list(g)))
+        times_by_event = {}
+        
+        for x in self.times_by_age_and_gender[key]['individual_race_times']:
+            print(x)
+            event_key = f"{x.distance}M {x.event_race_type.name}"
+            if event_key in times_by_event:
+                    times_by_event[event_key].append(x)
+            else: 
+                    times_by_event[event_key] = [x]
                
         if 'relay_race_times' in self.times_by_age_and_gender[key]:
             for k, g in itertools.groupby(self.times_by_age_and_gender[key]['relay_race_times'], lambda x: f"{x.distance}M {x.event_race_type.name} Relay"):
-                    times_by_event.append((k, list(g)))
-        for event in times_by_event:
-            tab = self.tabview.add(event[0]) 
-            event_label = CTkLabel(tab,font=('helvetica', 24), text="{} - {} times recorded".format(str(event[0]), len(event[1])))        
+                    times_by_event[k] = list(g)
+        for event in times_by_event.keys():
+            tab = self.tabview.add(event) 
+            times = times_by_event[event]
+            event_label = CTkLabel(tab,font=('helvetica', 24), text="{} - {} times recorded".format(str(event), len(times)))        
             event_label.pack(side=TOP)
             # Insert elements into the listbox'
             # listbox.insert(tk.END, "Name --- Age --- Team --- Seed --- Official") 
@@ -123,7 +138,7 @@ class PDFImport(CTkToplevel):
             ctk_textbox_scrollbar = CTkScrollbar(tab, command=treeview.yview)
             ctk_textbox_scrollbar.pack(side=RIGHT)
             treeview.configure(yscrollcommand=ctk_textbox_scrollbar.set)
-            for time in event[1]: 
+            for time in times: 
                 time_item = treeview.insert("", END, text=str(time), values=time.get_result())
                 # CTkLabel(self.resultSection, anchor=W, text=str(time), font=('helvetica', 18), justify='left').pack()
                 if isinstance(time, RelaySwimEntry):
@@ -134,8 +149,43 @@ class PDFImport(CTkToplevel):
                     # CTkLabel(self.resultSection, justify='left', text=team).pack()
                 # listbox.insert(tk.END, f"{time.swimmer.name} --- {time.swimmer.age} --- {time.swimmer.team} --- {time.seed_time} --- {time.most_recent_time}") 
     
+    def update_bad(self):
+        still_wrong = []
+        for f in self.textbox.get('4.0', 'end').split('\n'):
+            if not f:
+                continue
+            try:
+                entry = f.replace('  ', ' ').split(' ')
+                if len(entry) != 11:
+                    raise Exception
+                official_time = entry[5] # time 
+                result = "Finished" if not any(reason in official_time for reason in Utils.skip_reasons) else official_time
+                time_in_milis = Utils.convert_time_to_seconds(official_time) if not any(reason in official_time for reason in Utils.skip_reasons) else None
+                
+                new_entry = IndividualSwimEntry(entry[1],entry[2],entry[3],entry[4],entry[0],entry[6],result,time_in_milis,"",Stroke[entry[10]], entry[8],Gender[entry[7]], int(entry[9]))
+                group = f"{new_entry.gender.name}, {new_entry.age_group}"
+                if group in self.times_by_age_and_gender:
+                    self.times_by_age_and_gender[group]["individual_race_times"].append(new_entry)
+                else: 
+                    self.times_by_age_and_gender[group] = {
+                        "individual_race_times": [new_entry],
+                        "relay_race_times": []
+                    }               
+            except Exception as e:
+                print(f"worng {f} cause {e}")
+                still_wrong.append(f)
+                
+        self.textbox.delete('0.0', 'end')
+        if(len(still_wrong) > 0):
+            for x in still_wrong:
+                self.textbox.insert("0.0", f"{x}\n")
+            self.textbox.insert("0.0", f"Pl LastName FirstName Age TEAM OfficialTime Pts(0 if none awarded) GENDER AGE_GROUP Distance Stroke\n")
+        else:
+             self.textbox.insert("0.0", f"All Incorrect Entries Resolved\n")
+   
+   
     def save_results(self):
-        try: 
+        try:                
             LOGGER.info("entering PDFImportWindow.save_results")
             meet_id = str(uuid.uuid1())
             self.meet.record_id = meet_id
@@ -150,15 +200,23 @@ class PDFImport(CTkToplevel):
                 splitKey = key.split(', ')
                 gender = Gender[splitKey[0]]
                 age_group = splitKey[1]
-            
-                for k, g in itertools.groupby(value['individual_race_times'], lambda x: (x.event_race_type.name, x.distance)):
-                    event = RaceEvent(None, Stroke[k[0]], age_group, gender, k[1], False)
+                times_by_event = {}
+                for x in value['individual_race_times']:
+                    event_key = (x.distance, x.event_race_type.name)
+                    if event_key in times_by_event:
+                            times_by_event[event_key].append(x)
+                    else: 
+                            times_by_event[event_key] = [x]
+                print(times_by_event)
+                for k in times_by_event.keys():
+                    event = RaceEvent(None, Stroke[k[1]], age_group, gender, k[0], False)
                     event_id = list(events_by_id.keys())[list(events_by_id.values()).index(event)] if event in list(events_by_id.values()) else None
                     if not event_id:
+                        print(event)
                         event_id = self.dataAccess.create_event(event)
                         events_by_id[event_id] = event
                         
-                    for race_entry in list(g):
+                    for race_entry in list(times_by_event[k]):
                         race_entry: IndividualSwimEntry = race_entry 
                         swimmer = Racer(None,race_entry.racer_fname, race_entry.racer_lname, race_entry.racer_age, race_entry.racer_team, race_entry.gender, False)
                         racer_id = list(swimmers_by_id.keys())[list(swimmers_by_id.values()).index(swimmer)] if swimmer in list(swimmers_by_id.values()) else None
@@ -229,8 +287,8 @@ class PDFImport(CTkToplevel):
                                     aged_swimmers.append(relay_swimmer)
 
                             relay_swimmers.append(swimmer_id)
-                            
-                        relay_teams.append(RelayTeamBreakDown(str(uuid.uuid1()), race_id, relay_id, relay_swimmers[0],relay_swimmers[1], relay_swimmers[2], relay_swimmers[3]))
+                        if(len(relay_swimmers) == 4):
+                            relay_teams.append(RelayTeamBreakDown(str(uuid.uuid1()), race_id, relay_id, relay_swimmers[0],relay_swimmers[1], relay_swimmers[2], relay_swimmers[3]))
 
             self.dataAccess.create_swimmers(new_swimmers)
             # updating swimmers who have aged up by one 
